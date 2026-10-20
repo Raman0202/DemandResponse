@@ -1,0 +1,114 @@
+@import "tailwindcss";
+
+/* Colour is reserved for state (ISA-101 high-performance HMI). Neutral surfaces, muted text,
+   red/orange/yellow for alarm priorities, green only for confirmed delivery. */
+
+.theme-console {
+  --bg: #070d18;
+  --fg: #e2e8f0;
+  --fg-dim: #94a3b8;
+  --muted: #94a3b8;
+  --line: rgba(148, 163, 184, 0.18);
+  --chip: rgba(148, 163, 184, 0.12);
+  --chip-hover: rgba(148, 163, 184, 0.22);
+  --input: rgba(2, 6, 23, 0.6);
+  --glass: rgba(15, 23, 42, 0.86);
+  --glass-strong: rgba(15, 23, 42, 0.95);
+  --glass-border: rgba(148, 163, 184, 0.22);
+  --accent: #7dd3fc;
+  --accent-fg: #082f49;
+  --alarm: #f87171;
+  --alarm-bg: rgba(248, 113, 113, 0.14);
+  --warn: #fb923c;
+  --warn-bg: rgba(251, 146, 60, 0.14);
+  --p3: #facc15;
+  --p3-bg: rgba(250, 204, 21, 0.12);
+  --ok: #4ade80;
+  --ok-bg: rgba(74, 222, 128, 0.12);
+  --info: #93c5fd;
+  --info-bg: rgba(147, 197, 253, 0.12);
+  --map-land: #111b2e;
+  --map-edge: #24324d;
+  --map-line: #64748b;
+  color-scheme: dark;
+}
+
+.theme-portal {
+  --bg: #eef2f6;
+  --fg: #0f172a;
+  --fg-dim: #334155;
+  --muted: #475569;
+  --line: rgba(15, 23, 42, 0.12);
+  --chip: rgba(15, 23, 42, 0.05);
+  --chip-hover: rgba(15, 23, 42, 0.1);
+  --input: #ffffff;
+  --glass: #ffffff;
+  --glass-strong: rgba(255, 255, 255, 0.94);
+  --glass-border: rgba(15, 23, 42, 0.1);
+  --accent: #0f766e;
+  --accent-fg: #ffffff;
+  --alarm: #b91c1c;
+  --alarm-bg: #fee2e2;
+  --warn: #c2410c;
+  --warn-bg: #ffedd5;
+  --p3: #a16207;
+  --p3-bg: #fef9c3;
+  --ok: #15803d;
+  --ok-bg: #dcfce7;
+  --info: #1d4ed8;
+  --info-bg: #dbeafe;
+  color-scheme: light;
+}
+
+html,
+body {
+  height: 100%;
+  overflow: hidden; /* fit-to-screen: pages never scroll */
+}
+
+body {
+  background: var(--bg, #070d18);
+  color: var(--fg, #e2e8f0);
+  font-feature-settings: "tnum" 1;
+}
+
+.glass {
+  background: var(--glass);
+  border: 1px solid var(--glass-border);
+  box-shadow: 0 10px 30px -12px rgba(2, 6, 23, 0.45);
+  backdrop-filter: blur(12px);
+}
+.glass-strong {
+  background: var(--glass-strong);
+  border: 1px solid var(--glass-border);
+  backdrop-filter: blur(16px);
+}
+@supports not (backdrop-filter: blur(1px)) {
+  .theme-console .glass,
+  .theme-console .glass-strong {
+    background: #0f172a;
+  }
+  .theme-portal .glass-strong {
+    background: #ffffff;
+  }
+}
+
+.camera {
+  transition: all 650ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+@keyframes pulse-ring {
+  0% { opacity: 0.9; transform: scale(1); }
+  100% { opacity: 0; transform: scale(2.2); }
+}
+.pulse {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: pulse-ring 1.8s ease-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .camera { transition: none; }
+  .pulse { animation: none; opacity: 0.6; }
+  * { scroll-behavior: auto !important; }
+}
+
+.tabular-nums { font-variant-numeric: tabular-nums; }
