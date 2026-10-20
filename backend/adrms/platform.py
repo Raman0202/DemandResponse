@@ -25,6 +25,7 @@ from .optimiser import solve
 from .quality import QualityState, asset_vetoes, confidence, vetoes
 from .resources import catalog
 from .rotation import RotationManager
+from .trace import Tracer
 from .util import Rng, hhmm, r1
 
 DATA_DIR = Path(os.environ.get("GNA_DATA_DIR", Path(__file__).resolve().parents[2] / "data"))
@@ -63,6 +64,9 @@ class Platform:
         self.resources = {r.id: r for r in self.res_list}
         self.field = Field(self.res_list, COMMAND_KEYS, seed=seed, start_h=start_h)
         self.audit = AuditChain(clock=lambda: self.field.t)
+        self.tracer = Tracer(clock=lambda: self.field.t)
+        self.audit.on_append = self.tracer.from_audit
+        self.stage_ms: dict[str, float] = {}
         self.quality = QualityState()
         self.forecaster = Forecaster()
         self.alarms = AlarmEngine(self.audit)
@@ -71,6 +75,7 @@ class Platform:
         self.desk = IndustryDesk(self.gridflex, self.audit)
         self.rotation = RotationManager(self.audit, Rng(seed + 2))
         self.engine = EventEngine(self.resources, self.dispatcher, self.gridflex, self.audit)
+        self.engine.trace = self.tracer
         self.autonomy = Autonomy()
         self.prices = dict(C.DEFAULT_PRICES)
         self.dsm_table = C.default_dsm()
@@ -106,37 +111,52 @@ class Platform:
     def tick(self, dt: float | None = None) -> None:
         with self.lock:
             w0 = time.perf_counter()
+            marks: dict[str, float] = {}
+            last = [w0]
+
+            def lap(stage: str) -> None:
+                now = time.perf_counter()
+                marks[stage] = marks.get(stage, 0.0) + (now - last[0]) * 1000
+                last[0] = now
+
             dt = self.speed if dt is None else dt
             f = self.field
             f.step(dt)
             t = f.t
             raw = f.telemetry()
+            lap("ingest")
             self.points = pts = self.quality.evaluate(raw, t)
             self.conf = confidence(pts)
             self.vetoes = vetoes(pts, f.source)
             self.asset_veto = asset_vetoes(pts)
+            lap("quality")
             self.gs = gs = estimate(pts, t, self.dsm_table, self.prices, self.ace_offset)
+            lap("estimate")
             for r in self.res_list:
                 p = pts.get(f"res:{r.id}")
                 r.delivering = float(p.value or 0.0) if p else 0.0
                 if r.type == "BESS" and pts[f"soc:{r.id}"].flag == "GOOD":
                     r.extra["soc_seen"] = pts[f"soc:{r.id}"].value
             self.gridflex.meter(self.resources, f.actual["res_mw"], self.block)
+            lap("mv")
             ev = self.engine.event
             direction = ev.direction if ev else gs.direction
             minute = int(t // 60)
             if minute != self.last_minute or not self.fc:
                 self.last_minute = minute
                 self.fc = self.forecaster.update(t, gs, self.engine.delivering_total(direction) + self.rotation.measured_mw, direction)
+            lap("forecast")
             latency_high = len(self.latency) >= 3 and sum(list(self.latency)[-3:]) / 3 > C.LOOP_LATENCY_WARN_S
             prev_eff = self.autonomy.effective
             self.autonomy.update(self.conf, self.vetoes, latency_high)
             if prev_eff != self.autonomy.effective:
                 self.audit.append("AUTONOMY", "policy", None, f"Autonomy {prev_eff} → {self.autonomy.effective}: {'; '.join(self.autonomy.reasons) or 'restored'}")
+            lap("policy")
             hb_age = {k[3:]: p.age for k, p in pts.items() if k.startswith("hb:")}
             inc = next((i.id for i in reversed(self.alarms.incidents) if i.closed_at is None), None)
             notes = self.engine.step(t, self.now_abs, dt, gs, self.fc, self.autonomy, self.prices, self.dsm_table,
                                      self.asset_veto, hb_age, self.rotation.measured_mw, t / 3600, self.block, inc)
+            lap("decide")
             # rotation
             ev = self.engine.event
             if ev:
@@ -149,7 +169,9 @@ class Platform:
                 residual = 0.0
             band1 = band_edges(self.dsm_table, gs.schedule)[0]
             self.rotation.step(t, self.now_abs, dt, residual, gs.freq, band1, gs.loads, f)
+            lap("rotate")
             self._alarms(t, gs, notes, hb_age, latency_high)
+            lap("detect")
             self.history.append({
                 "t": t, "freq": round(gs.freq, 4), "ace": r1(gs.ace), "demand": r1(gs.demand), "drawal": r1(gs.drawal),
                 "schedule": r1(gs.schedule), "re": r1(gs.re), "req": r1(ev.requirement if ev else gs.requirement),
@@ -157,6 +179,8 @@ class Platform:
                 "dsm": gs.dsm["amount"], "conf": round(self.conf, 3),
             })
             self.tick_count += 1
+            lap("audit")
+            self.stage_ms = {k: round(v, 3) for k, v in marks.items()}
             el = time.perf_counter() - w0
             self.latency.append(el)
             self.snapshot_cache = {}
@@ -236,7 +260,7 @@ class Platform:
                 self.field.stop_scenario(kw["key"])
                 self.audit.append("SCENARIO", u, kw["key"], f"Scenario stopped: {SCENARIOS[kw['key']]['label']}")
             elif name == "speed":
-                self.speed = float(max(1, min(60, kw["speed"])))
+                self.speed = float(max(1, min(120, kw["speed"])))
             elif name == "pause":
                 self.running = not bool(kw.get("paused", self.running))
             elif name == "autonomy":
@@ -542,6 +566,9 @@ class Platform:
                 "ledger": self._shortage_ledger(),
                 "audit": {"length": len(self.audit.entries), "head": self.audit.head, "recent": list(reversed(self.audit.entries[-80:]))},
                 "history": list(self.history),
+                "pipeline": self._pipeline(),
+                "tick_ms": round(sum(self.stage_ms.values()), 3),
+                "trace": self.tracer.snapshot(90),
                 "scenarios": [{"key": k, **v, "active": bool(f.active(k)), "until": (lambda s: s.end if s else None)(f.active(k))}
                               for k, v in SCENARIOS.items()],
                 "config": {"dsm_table": self.dsm_table.to_dict(), "prices": self.prices, "bias": C.BIAS_MW_PER_0_1HZ,
@@ -552,6 +579,35 @@ class Platform:
             }
             self.snapshot_cache = snap
             return snap
+
+    def _pipeline(self) -> list[dict]:
+        """One row per loop stage: wall time this tick and what it concluded."""
+        gs, ev, ms = self.gs, self.engine.event, self.stage_ms
+        plan = (ev.plan if ev else None) or {}
+        sv = plan.get("solver", {})
+        cmds = self.dispatcher.live()
+        fc = self.fc or {}
+        rows = [
+            ("ingest", "SCADA / field", f"{len(self.points)} points · {self.field.source.lower()}"),
+            ("quality", "Data quality", f"{self.conf * 100:.1f}% confidence · {len(self.vetoes)} veto"),
+            ("estimate", "State estimate", f"demand {gs.demand:,.0f} · drawal {gs.drawal:,.0f} MW · DC flow"),
+            ("assess", "ACE & DSM", f"ACE {gs.ace:+.0f} MW · {gs.severity} · DSM ₹{gs.dsm['amount'] / 1e5:.1f} L/blk"),
+            ("forecast", "Forecast", f"next ACE {fc['blocks'][0]['ace']['p50']:+.0f} MW" if fc.get("blocks") else "warming up"),
+            ("detect", "Alarms", f"P1 {self.alarms.snapshot(self.field.t)['counts']['P1']} · P2 {self.alarms.snapshot(self.field.t)['counts']['P2']}"),
+            ("decide", "DR event", f"{ev.id} · {ev.phase} · req {ev.requirement:.0f} MW" if ev else f"monitoring · |ACE| {abs(gs.ace):.0f}/{C.ACE_ALERT_MW:.0f} MW"),
+            ("optimise", "LP optimiser", f"{plan.get('status', '—')} · {sv.get('solve_ms', 0):.1f} ms · {sv.get('vars', 0)}×{sv.get('rows', 0)}" if plan else "idle"),
+            ("twin", "Digital Twin", ("PASS" if ev.twin["passed"] else "FAIL") + f" · {ev.twin_passes} pass" if ev and ev.twin else "idle"),
+            ("policy", "Autonomy policy", f"{self.autonomy.effective}" + (f" (degraded)" if self.autonomy.effective != self.autonomy.configured else "")),
+            ("dispatch", "Dispatch", f"{sum(1 for c in cmds if c.state == 'EXECUTING')} executing · {sum(1 for c in cmds if c.state == 'AWAITING_APPROVAL')} awaiting"),
+            ("rotate", "Load rotation", (self.rotation.order.state.lower() + f" · {self.rotation.measured_mw:.0f} MW") if self.rotation.order else "standby"),
+            ("mv", "M&V", f"{self.engine.delivering_total(ev.direction if ev else gs.direction):.0f} MW metered"),
+            ("audit", "Audit chain", f"#{len(self.audit.entries)} · {self.audit.head[:8]}"),
+        ]
+        out = [{"stage": k, "label": lab, "ms": ms.get(k, 0.0), "summary": summ} for k, lab, summ in rows]
+        for r in out:
+            if r["stage"] == "optimise":
+                r["ms"] = sv.get("solve_ms", 0.0)      # last HiGHS solve (runs inside "decide" on re-solve)
+        return out
 
     def _avail(self, r, direction, gs) -> float:
         from .resources import available

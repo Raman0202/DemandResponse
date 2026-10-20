@@ -1,62 +1,55 @@
 @import "tailwindcss";
 
-/* Colour is reserved for state (ISA-101 high-performance HMI). Neutral surfaces, muted text,
-   red/orange/yellow for alarm priorities, green only for confirmed delivery. */
+/* GNA (Demand Response) — one light theme, GNAi orange brand.
+   Orange is the brand and navigation/selection colour. State colours stay distinct
+   (red alarm, amber warning, yellow P3, green confirmed) and are always paired with a glyph or label. */
 
-.theme-console {
-  --bg: #070d18;
-  --fg: #e2e8f0;
-  --fg-dim: #94a3b8;
-  --muted: #94a3b8;
-  --line: rgba(148, 163, 184, 0.18);
-  --chip: rgba(148, 163, 184, 0.12);
-  --chip-hover: rgba(148, 163, 184, 0.22);
-  --input: rgba(2, 6, 23, 0.6);
-  --glass: rgba(15, 23, 42, 0.86);
-  --glass-strong: rgba(15, 23, 42, 0.95);
-  --glass-border: rgba(148, 163, 184, 0.22);
-  --accent: #7dd3fc;
-  --accent-fg: #082f49;
-  --alarm: #f87171;
-  --alarm-bg: rgba(248, 113, 113, 0.14);
-  --warn: #fb923c;
-  --warn-bg: rgba(251, 146, 60, 0.14);
-  --p3: #facc15;
-  --p3-bg: rgba(250, 204, 21, 0.12);
-  --ok: #4ade80;
-  --ok-bg: rgba(74, 222, 128, 0.12);
-  --info: #93c5fd;
-  --info-bg: rgba(147, 197, 253, 0.12);
-  --map-land: #111b2e;
-  --map-edge: #24324d;
-  --map-line: #64748b;
-  color-scheme: dark;
-}
-
+:root,
+.theme-console,
 .theme-portal {
-  --bg: #eef2f6;
-  --fg: #0f172a;
-  --fg-dim: #334155;
-  --muted: #475569;
-  --line: rgba(15, 23, 42, 0.12);
-  --chip: rgba(15, 23, 42, 0.05);
-  --chip-hover: rgba(15, 23, 42, 0.1);
+  --bg: #f5f6f8;          /* page */
+  --s1: #ffffff;          /* card */
+  --s2: #f4f5f7;          /* card header band / raised */
+  --s3: #eceef2;          /* hover */
+  --fg: #1f2937;
+  --fg-dim: #374151;
+  --muted: #6b7280;
+  --line: #e5e7eb;
+  --line-strong: #d4d8de;
+  --chip: #f2f3f5;
+  --chip-hover: #e8eaee;
   --input: #ffffff;
-  --glass: #ffffff;
-  --glass-strong: rgba(255, 255, 255, 0.94);
-  --glass-border: rgba(15, 23, 42, 0.1);
-  --accent: #0f766e;
+  --glass: rgba(255, 255, 255, 0.94);
+  --glass-strong: rgba(255, 255, 255, 0.98);
+  --glass-border: #e3e6ea;
+
+  --accent: #f26b1d;       /* GNAi orange: fills, borders, icons */
+  --accent-2: #f7941d;     /* gradient partner */
+  --accent-ink: #c4510c;   /* orange text on white (≥ 4.5:1) */
   --accent-fg: #ffffff;
-  --alarm: #b91c1c;
-  --alarm-bg: #fee2e2;
-  --warn: #c2410c;
-  --warn-bg: #ffedd5;
+  --accent-soft: #fff1e7;
+  --accent-line: #f8c7a6;
+
+  --alarm: #d92d20;
+  --alarm-bg: #fef1f0;
+  --warn: #b45309;
+  --warn-bg: #fff8e6;
   --p3: #a16207;
-  --p3-bg: #fef9c3;
+  --p3-bg: #fefbe8;
   --ok: #15803d;
-  --ok-bg: #dcfce7;
+  --ok-bg: #ecfdf3;
   --info: #1d4ed8;
-  --info-bg: #dbeafe;
+  --info-bg: #eff4ff;
+
+  /* tinted column groups (as in the GNAi planning tables) */
+  --tint-peach: #fff5ee;
+  --tint-sand: #fffbea;
+  --tint-sky: #f1f6fd;
+
+  --map-land: #ffffff;
+  --map-edge: #cfd5dd;
+  --map-line: #9aa3b0;
+  --map-bus: #4b5563;
   color-scheme: light;
 }
 
@@ -67,35 +60,56 @@ body {
 }
 
 body {
-  background: var(--bg, #070d18);
-  color: var(--fg, #e2e8f0);
-  font-feature-settings: "tnum" 1;
+  background: var(--bg);
+  color: var(--fg);
+  font-family: Poppins, "Segoe UI", Inter, ui-sans-serif, system-ui, -apple-system, Roboto, sans-serif;
+}
+
+.num {
+  font-variant-numeric: tabular-nums;
+}
+
+.brand-text {
+  background: linear-gradient(90deg, var(--accent), var(--accent-2));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+.brand-fill {
+  background: linear-gradient(135deg, var(--accent), var(--accent-2));
+}
+
+.card {
+  background: var(--s1);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  box-shadow: 0 1px 2px rgba(16, 24, 40, 0.04);
 }
 
 .glass {
   background: var(--glass);
   border: 1px solid var(--glass-border);
-  box-shadow: 0 10px 30px -12px rgba(2, 6, 23, 0.45);
-  backdrop-filter: blur(12px);
+  border-radius: 12px;
+  box-shadow: 0 8px 24px -12px rgba(16, 24, 40, 0.18);
+  backdrop-filter: blur(10px);
 }
 .glass-strong {
   background: var(--glass-strong);
   border: 1px solid var(--glass-border);
-  backdrop-filter: blur(16px);
+  box-shadow: 0 20px 48px -16px rgba(16, 24, 40, 0.28);
+  backdrop-filter: blur(12px);
 }
 @supports not (backdrop-filter: blur(1px)) {
-  .theme-console .glass,
-  .theme-console .glass-strong {
-    background: #0f172a;
-  }
-  .theme-portal .glass-strong {
-    background: #ffffff;
-  }
+  .glass, .glass-strong { background: #ffffff; }
 }
 
-.camera {
-  transition: all 650ms cubic-bezier(0.22, 1, 0.36, 1);
+.label {
+  font-size: 10px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--muted);
 }
+
 @keyframes pulse-ring {
   0% { opacity: 0.9; transform: scale(1); }
   100% { opacity: 0; transform: scale(2.2); }
@@ -105,10 +119,9 @@ body {
   transform-origin: center;
   animation: pulse-ring 1.8s ease-out infinite;
 }
-@media (prefers-reduced-motion: reduce) {
-  .camera { transition: none; }
-  .pulse { animation: none; opacity: 0.6; }
-  * { scroll-behavior: auto !important; }
-}
+@keyframes blink { 50% { opacity: 0.35; } }
+.blink { animation: blink 1.2s steps(2, start) infinite; }
 
-.tabular-nums { font-variant-numeric: tabular-nums; }
+@media (prefers-reduced-motion: reduce) {
+  .pulse, .blink { animation: none; }
+}

@@ -10,3 +10,4 @@ data/*.json
 .env
 .env.local
 *.log
+*.tsbuildinfo

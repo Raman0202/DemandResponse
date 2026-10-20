@@ -3,6 +3,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
+import time
+
 import highspy
 import numpy as np
 
@@ -150,7 +152,9 @@ def solve(resources: list[Resource], ctx: OptContext, types: list[str] | None = 
     if rows_lo:
         h.addRows(len(rows_lo), np.array(rows_lo), np.array(rows_hi), len(idx),
                   np.array(starts, dtype=np.int32), np.array(idx, dtype=np.int32), np.array(vals, dtype=float))
+    _t0 = time.perf_counter()
     h.run()
+    solve_ms = (time.perf_counter() - _t0) * 1000
     status = h.modelStatusToString(h.getModelStatus())
     sol = h.getSolution()
     xv = np.array(sol.col_value) if ncol else np.zeros(0)
@@ -241,6 +245,8 @@ def solve(resources: list[Resource], ctx: OptContext, types: list[str] | None = 
         "worst_line_base": {"line": worst_base[0], "loading": round(worst_base[1], 3)},
         "time_to_effect_min": min((a["response_delay_min"] for a in allocs), default=None),
         "blocks": B,
+        "solver": {"engine": "HiGHS", "solve_ms": round(solve_ms, 2), "vars": int(ncol), "rows": len(rows_lo),
+                   "nonzeros": len(idx), "objective": round(float(h.getInfo().objective_function_value), 1) if status == "Optimal" else None},
     }
 
 

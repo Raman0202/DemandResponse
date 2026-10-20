@@ -213,7 +213,8 @@ class RotationManager:
             o.log += [{**e, "t": t, "action": "OUT"} for e in log]
             o.exclusions = excl
             o.state = "ACTIVE"
-            self.audit.append("ROTATION_ACTIVE", "system", o.id, f"Rotated out {', '.join(o.groups)} ({self.planned_out():.0f} MW planned)")
+            self.audit.append("ROTATION_ACTIVE", "system", o.id, f"Rotated out {', '.join(o.groups)} ({self.planned_out():.0f} MW planned) — "
+                              + "; ".join(f"{e['group']}: {e['reason']}" for e in log[:3]))
         if o and o.state in ("ACTIVE", "RESTORING"):
             self._manage(o, t, now_abs, residual, loads)
         # physical effect (relief realised ~92% of plan, with noise) and metering

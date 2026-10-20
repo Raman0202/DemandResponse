@@ -81,6 +81,7 @@ class EventEngine:
         self.open_since: float | None = None
         self.cooldown_until: float = -1e9
         self.latest_ctx: OptContext | None = None
+        self.trace = None   # Tracer, set by the platform
 
     # -------------------------------------------------------------- helpers
     def delivering_total(self, direction: str) -> float:
@@ -164,7 +165,9 @@ class EventEngine:
         self.event = ev
         self.open_since = None
         self.audit.append("EVENT_OPEN", "system", ev.id,
-                          f"DR event opened: ACE {gs.ace:.0f} MW, direction {gs.direction}, {gs.severity}")
+                          f"DR event opened: ACE {gs.ace:.0f} MW, direction {gs.direction}, {gs.severity} — "
+                          + ("EMERGENCY opens immediately" if gs.severity == "EMERGENCY"
+                             else f"|ACE| ≥ {C.ACE_ALERT_MW:.0f} MW sustained {C.EVENT_OPEN_HOLD_S} s"))
 
     def build_ctx(self, gs, fc, prices, dsm_table, rotated_mw, hour, severity=None, direction=None, req_override=None,
                   participation: float | None = None) -> tuple[OptContext, dict[str, float]]:
@@ -228,6 +231,22 @@ class EventEngine:
         self.audit.append("ANALYSIS", "optimiser", ev.id,
                           f"Re-solve ({reason}): req {ev.requirement:.0f} MW, {plan['status']}, supplied {plan['supplied'][0]:.0f} MW, "
                           f"total ₹{plan['costs']['total_rs']:,}, twin {'PASS' if twin['passed'] else 'FAIL'} after {passes} pass(es)")
+        if self.trace:
+            sv = plan.get("solver", {})
+            c = plan["costs"]
+            self.trace.add("optimise", f"LP re-solve: {plan['status']} in {sv.get('solve_ms', 0):.1f} ms",
+                           f"{reason}. {sv.get('vars')} vars × {sv.get('rows')} rows; supplies {plan['supplied'][0]:.0f} of {plan['req'][0]:.0f} MW in block 1; "
+                           f"total ₹{c['total_rs']:,} vs do-nothing ₹{c['do_nothing_rs']:,}",
+                           "info", ev.id, {"solver": sv, "allocations": [
+                               {"id": a["id"], "name": a["name"], "tier": a["tier"], "x1": a["x"][0], "exp1": a["expected"][0],
+                                "eff": a["effective"], "phi1": a["phi"][0], "caps": a["caps"]} for a in plan["allocations"][:8]],
+                               "skipped": plan["skipped"][:6], "binding": plan["binding_lines"][:3], "costs": c})
+            fails = [k for k in twin["checks"] if k["status"] != "pass"]
+            self.trace.add("twin", f"Digital Twin {'PASS' if twin['passed'] else 'FAIL'} after {passes} pass(es)",
+                           "; ".join(f"{k['name']}: {k['detail']}" for k in fails) or "all nine checks passed",
+                           "ok" if twin["passed"] else "alarm", ev.id,
+                           {"checks": [{"name": k["name"], "status": k["status"]} for k in twin["checks"]],
+                            "exclude": twin["exclude"], "derate": twin["derate"]})
         self._policy_and_commands(t, autonomy, asset_veto, plan, twin)
 
     def _policy_and_commands(self, t, autonomy, asset_veto, plan, twin) -> None:

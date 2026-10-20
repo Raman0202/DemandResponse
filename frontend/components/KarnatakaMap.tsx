@@ -115,12 +115,12 @@ export default function KarnatakaMap({ snap, insetRight = 0, insetTop = 0, inset
         aria-label="Karnataka transmission network">
         <defs>
           <pattern id="grid" width="20" height="20" patternUnits="userSpaceOnUse">
-            <path d="M 20 0 L 0 0 0 20" fill="none" stroke="#0f1a2c" strokeWidth={0.5} />
+            <path d="M 20 0 L 0 0 0 20" fill="none" stroke="#eef0f3" strokeWidth={0.5} />
           </pattern>
         </defs>
         <rect x={vb[0]} y={vb[1]} width={vb[2]} height={vb[3]} fill="url(#grid)" />
         <polygon points={outline} fill="var(--map-land)" stroke="var(--map-edge)" strokeWidth={1.4 * k} />
-        <text x={X(74.3)} y={Y(13.0)} fontSize={11 * k} fill="#334155" transform={`rotate(-62 ${X(74.3)} ${Y(13.0)})`}>ARABIAN SEA</text>
+        <text x={X(74.3)} y={Y(13.0)} fontSize={11 * k} fill="#b8c0cc" transform={`rotate(-62 ${X(74.3)} ${Y(13.0)})`}>ARABIAN SEA</text>
 
         {/* lines */}
         {g.lines.map((ln: any) => {
@@ -161,10 +161,34 @@ export default function KarnatakaMap({ snap, insetRight = 0, insetTop = 0, inset
           return (
             <g key={`${gr.id}:${st.name}`}>
               <rect x={x - 2.4 * k} y={y - 2.4 * k} width={4.8 * k} height={4.8 * k} transform={`rotate(45 ${x} ${y})`}
-                fill={out ? 'var(--warn)' : '#334155'} stroke={out ? 'var(--warn)' : 'none'} />
+                fill={out ? 'var(--warn)' : '#c5ccd6'} stroke={out ? 'var(--warn)' : 'none'} />
             </g>
           );
         }))}
+
+        {/* flexibility layer: resources sized by available MW, filled when delivering */}
+        {mode === 'dr' && res.filter((r) => r.type !== 'RTM').map((r, i) => {
+          const b = busBy[r.bus];
+          if (!b) return null;
+          const same = res.filter((x) => x.bus === r.bus && x.type !== 'RTM');
+          const j = same.findIndex((x) => x.id === r.id);
+          const ang = -Math.PI / 2 + (j / Math.max(1, same.length)) * Math.PI * 2;
+          const x = X(b.lon) + Math.cos(ang) * 16 * k, y = Y(b.lat) + Math.sin(ang) * 16 * k;
+          const rr = (2.5 + Math.sqrt(Math.max(r.available, r.delivering, 1)) / 3.2) * k;
+          const on = r.delivering > 0.5;
+          const shape = r.type === 'BESS' ? 'sq' : r.type === 'INDUSTRIAL' ? 'tri' : 'ci';
+          const fill = on ? 'var(--ok)' : 'transparent';
+          const stroke = r.veto ? 'var(--warn)' : on ? 'var(--ok)' : 'var(--fg-dim)';
+          return (
+            <g key={r.id + i}>
+              <title>{`${r.name}: ${on ? `${r.delivering.toFixed(0)} MW delivering` : `${r.available.toFixed(0)} MW available`}`}</title>
+              <line x1={X(b.lon)} y1={Y(b.lat)} x2={x} y2={y} stroke="var(--line-strong)" strokeWidth={0.8 * k} />
+              {shape === 'sq' && <rect x={x - rr} y={y - rr} width={2 * rr} height={2 * rr} fill={fill} fillOpacity={0.55} stroke={stroke} strokeWidth={1.2 * k} />}
+              {shape === 'tri' && <path d={`M ${x} ${y - rr * 1.2} L ${x + rr * 1.1} ${y + rr * 0.8} L ${x - rr * 1.1} ${y + rr * 0.8} z`} fill={fill} fillOpacity={0.55} stroke={stroke} strokeWidth={1.2 * k} />}
+              {shape === 'ci' && <circle cx={x} cy={y} r={rr} fill={fill} fillOpacity={0.55} stroke={stroke} strokeWidth={1.2 * k} />}
+            </g>
+          );
+        })}
 
         {/* buses */}
         {buses.map((b) => {
@@ -181,14 +205,14 @@ export default function KarnatakaMap({ snap, insetRight = 0, insetTop = 0, inset
               {rotOut && <circle cx={x} cy={y} r={r + 6 * k} fill="none" stroke="var(--warn)" strokeWidth={1.4 * k} strokeDasharray={`${3 * k} ${2 * k}`} />}
               {(sel || hl) && <circle cx={x} cy={y} r={r + 8 * k} fill="none" stroke="var(--accent)" strokeWidth={1.6 * k} />}
               {b.tie ? (
-                <rect x={x - r} y={y - r} width={2 * r} height={2 * r} fill="#1e293b" stroke="#cbd5e1" strokeWidth={1.2 * k} />
+                <rect x={x - r} y={y - r} width={2 * r} height={2 * r} fill="#ffffff" stroke="var(--map-bus)" strokeWidth={1.2 * k} />
               ) : (
-                <circle cx={x} cy={y} r={r} fill="#1e293b" stroke="#cbd5e1" strokeWidth={1.2 * k} />
+                <circle cx={x} cy={y} r={r} fill="#ffffff" stroke="var(--map-bus)" strokeWidth={1.2 * k} />
               )}
               {b.flag !== 'GOOD' && (
                 <text x={x + r} y={y - r} fontSize={10 * k} fontWeight={700} fill="var(--p3)">?</text>
               )}
-              <text x={x + r + 3 * k} y={y + 3 * k} fontSize={8.5 * k} fill="#cbd5e1">{b.name.split(' (')[0]}</text>
+              <text x={x + r + 3 * k} y={y + 3 * k} fontSize={8.5 * k} fill="var(--fg-dim)">{b.name.split(' (')[0]}</text>
             </g>
           );
         })}
@@ -196,14 +220,30 @@ export default function KarnatakaMap({ snap, insetRight = 0, insetTop = 0, inset
 
       {/* legend */}
       <div className="glass pointer-events-none absolute flex flex-wrap items-center gap-x-3 gap-y-1 rounded-lg px-2.5 py-1.5 text-[10px] text-[var(--muted)]"
-        style={{ left: insetLeft + 12, bottom: insetBottom + 12 }}>
+        style={{ left: insetLeft + 12, bottom: insetBottom + 4 }}>
         <span className="flex items-center gap-1"><i className="inline-block h-0.5 w-4 bg-[var(--map-line)]" /> line</span>
         <span className="flex items-center gap-1"><i className="inline-block h-0.5 w-4 bg-[var(--p3)]" /> ≥ 90%</span>
         <span className="flex items-center gap-1"><i className="inline-block h-0.5 w-4 bg-[var(--alarm)]" /> ≥ 100%</span>
-        <span className="flex items-center gap-1"><i className="inline-block h-2 w-2 rounded-full border border-[var(--ok)]" /> DR delivering</span>
-        <span className="flex items-center gap-1"><i className="inline-block h-2 w-2 rounded-full border border-dashed border-[var(--warn)]" /> rotated out</span>
-        <span className="flex items-center gap-1"><i className="inline-block h-2 w-2 border border-slate-300" /> tie bus</span>
-        <span>Schematic geography · DC screening model</span>
+        {mode === 'dr' ? (
+          <>
+            <span className="flex items-center gap-1"><i className="inline-block h-2 w-2 border border-[var(--fg-dim)]" /> BESS</span>
+            <span className="flex items-center gap-1">△ industry</span>
+            <span className="flex items-center gap-1"><i className="inline-block h-2 w-2 rounded-full border border-[var(--fg-dim)]" /> other flex</span>
+            <span className="flex items-center gap-1"><i className="inline-block h-2 w-2 rounded-full bg-[var(--ok)]" /> delivering</span>
+          </>
+        ) : mode === 'rotation' ? (
+          <>
+            <span className="flex items-center gap-1"><i className="inline-block h-2 w-2 rotate-45 bg-[var(--warn)]" /> station rotated out</span>
+            <span className="flex items-center gap-1"><i className="inline-block h-2 w-2 rotate-45 bg-[#c5ccd6]" /> roster station</span>
+          </>
+        ) : (
+          <>
+            <span className="flex items-center gap-1"><i className="inline-block h-2 w-2 rounded-full border border-[var(--ok)]" /> DR delivering</span>
+            <span className="flex items-center gap-1"><i className="inline-block h-2 w-2 rounded-full border border-dashed border-[var(--warn)]" /> rotated out</span>
+          </>
+        )}
+        <span className="flex items-center gap-1"><i className="inline-block h-2 w-2 border border-[var(--map-bus)]" /> tie bus</span>
+        <span>· schematic geography · DC screen</span>
       </div>
 
       {anchor && selected && <Anchored snap={snap} sel={selected} pos={anchor} res={res} busBy={busBy} onClose={() => onSelect(null)} bounds={{ w, h, right: insetRight }} />}
@@ -215,7 +255,7 @@ function Anchored({ snap, sel, pos, res, busBy, onClose, bounds }: any) {
   const width = 280;
   let left = pos.x + 24;
   if (left + width > bounds.w - bounds.right - 8) left = pos.x - width - 24;
-  const top = Math.max(110, Math.min(bounds.h - 300, pos.y - 60));
+  const top = Math.max(56, Math.min(bounds.h - 320, pos.y - 60));
   const g = snap.grid;
   let body: React.ReactNode = null;
   let title = '';
@@ -231,7 +271,7 @@ function Anchored({ snap, sel, pos, res, busBy, onClose, bounds }: any) {
         <div className="grid grid-cols-3 gap-2 text-[11px]">
           <div><div className="text-[var(--muted)]">Load</div><div className="font-semibold tabular-nums">{mw(b.load)}</div></div>
           <div><div className="text-[var(--muted)]">V (screen)</div><div className={cx('font-semibold tabular-nums', b.v < 0.95 && 'text-[var(--warn)]')}>{b.v.toFixed(3)} pu</div></div>
-          <div><div className="text-[var(--muted)]">Telemetry</div><Chip tone={b.flag === 'GOOD' ? 'neutral' : 'p3'} icon={b.flag !== 'GOOD'}>{b.flag}</Chip></div>
+          <div><div className="text-[var(--muted)]">Telemetry</div><Chip tone={b.flag === 'GOOD' ? 'neutral' : 'p3'} glyph={b.flag !== 'GOOD'}>{b.flag}</Chip></div>
         </div>
         <div className="mt-2 text-[10px] uppercase tracking-wider text-[var(--muted)]">{b.discom}{b.tie ? ' · inter-state tie' : ''}</div>
         {(b.dr > 0 || b.rotated > 0) && (

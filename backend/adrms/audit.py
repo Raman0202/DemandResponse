@@ -12,6 +12,7 @@ class AuditChain:
     def __init__(self, clock=None) -> None:
         self.entries: list[dict] = []
         self.clock = clock or (lambda: 0.0)
+        self.on_append = None   # optional observer (decision trace)
 
     @property
     def head(self) -> str:
@@ -29,6 +30,8 @@ class AuditChain:
              "message": message}
         e["hash"] = self.digest(self.head, seq, ts, kind, actor, e["ref"], message)
         self.entries.append(e)
+        if self.on_append:
+            self.on_append(e)
         return e
 
     def verify(self) -> dict:

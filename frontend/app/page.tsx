@@ -1,17 +1,18 @@
 'use client';
 import { FormEvent, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Btn, cx, inputCls } from '@/components/ui';
+import { Brand, Btn, Icon, cx, inputCls } from '@/components/ui';
 import { claims, login } from '@/lib/api';
 
-const CONTROL = [
-  ['operator', 'Operator'], ['sic1', 'Shift-in-charge A (dual)'], ['sic2', 'Shift-in-charge B (dual)'],
-  ['engineer', 'Engineer'], ['analyst', 'Analyst'], ['admin', 'Admin'],
-];
-const INDUSTRY = [
-  ['jsw', 'JSW Steel'], ['mrpl', 'MRPL refinery'], ['cement', 'Cement cluster'], ['dc', 'Data-centre campus'],
-  ['sugar', 'Sugar co-gen'], ['guest', 'New industry (apply)'],
-];
+const ACCOUNTS = {
+  control: [['operator', 'Operator'], ['sic1', 'Shift-in-charge A'], ['sic2', 'Shift-in-charge B'], ['engineer', 'Engineer'], ['analyst', 'Analyst'], ['admin', 'Admin']],
+  industry: [['jsw', 'JSW Steel'], ['mrpl', 'MRPL refinery'], ['cement', 'Cement cluster'], ['dc', 'Data-centre campus'], ['sugar', 'Sugar co-gen'], ['guest', 'New industry']],
+};
+
+const FLOWS = {
+  control: { title: 'SLDC control room', icon: 'grid', blurb: 'Situation map, DR event workflow, approvals, load rotation, settlement and audit.' },
+  industry: { title: 'Industry portal', icon: 'factory', blurb: 'See what the SLDC offers and needs, bid flexibility, track delivery and payments.' },
+} as const;
 
 export default function Landing() {
   const router = useRouter();
@@ -40,67 +41,61 @@ export default function Landing() {
     }
   };
 
-  const industry = mode === 'industry';
   return (
-    <div className={cx('grid h-screen w-screen grid-cols-[1.1fr_1fr] overflow-hidden', industry ? 'theme-portal' : 'theme-console')}>
-      <div className="relative flex flex-col justify-between overflow-hidden bg-[#070d18] p-10 text-slate-200">
-        <div className="pointer-events-none absolute inset-0 opacity-30" style={{ background: 'radial-gradient(60% 50% at 30% 40%, rgba(125,211,252,0.25), transparent 70%)' }} />
+    <div className="theme-console grid h-screen w-screen grid-cols-[1.15fr_1fr] overflow-hidden bg-[var(--bg)] text-[var(--fg)]">
+      <section className="relative flex flex-col justify-between overflow-hidden border-r border-[var(--line)] p-10">
+        <div className="pointer-events-none absolute inset-0" style={{ backgroundImage: 'linear-gradient(var(--line) 1px, transparent 1px), linear-gradient(90deg, var(--line) 1px, transparent 1px)', backgroundSize: '40px 40px', opacity: 0.35, maskImage: 'radial-gradient(70% 60% at 40% 45%, black, transparent)' }} />
         <div className="relative flex items-center gap-3">
-          <div className="grid h-10 w-10 place-items-center rounded-lg bg-sky-300 text-sm font-black text-sky-950">GNA</div>
-          <div>
-            <div className="text-xl font-semibold">GNA <span className="font-normal text-slate-400">(Demand Response)</span></div>
-            <div className="text-xs text-slate-400">Automated Demand Response Management System · Karnataka SLDC</div>
+          <Brand size="lg" />
+          <div className="text-xs text-[var(--muted)]">Automated Demand Response Management System<br />Karnataka SLDC</div>
+        </div>
+
+        <div className="relative max-w-2xl">
+          <h1 className="text-[34px] font-semibold leading-tight tracking-tight">Close the gap between schedule and drawal —<br /><span className="text-[var(--accent-ink)]">at the lowest cost, with proof.</span></h1>
+          <div className="mt-8 grid grid-cols-5 gap-2">
+            {[['target', 'Assess', 'ACE · DSM · forecast'], ['event', 'Optimise', 'priority LP on HiGHS'], ['shield', 'Screen', 'Digital Twin gate'], ['lock', 'Dispatch', 'HMAC setpoints'], ['receipt', 'Settle', 'M&V · audit chain']].map(([i, t, d], k) => (
+              <div key={t} className="card relative p-3">
+                <div className="mb-2 flex items-center justify-between"><Icon name={i} size={16} className="text-[var(--accent-ink)]" /><span className="num text-[10px] text-[var(--muted)]">0{k + 1}</span></div>
+                <div className="text-sm font-semibold">{t}</div>
+                <div className="text-[11px] text-[var(--muted)]">{d}</div>
+              </div>
+            ))}
+          </div>
+          <div className="mt-3 grid grid-cols-3 gap-2 text-[11px] text-[var(--fg-dim)]">
+            {['BESS → industry → other flexibility → RTM, load rotation last', 'Fit-to-screen spatial console built on ISA-101 HMI practice', 'Separate industry portal: offers, delivery, earnings'].map((x) => (
+              <div key={x} className="flex gap-2"><Icon name="check" size={13} className="mt-0.5 text-[var(--ok)]" />{x}</div>
+            ))}
           </div>
         </div>
-        <div className="relative max-w-xl space-y-5">
-          <h1 className="text-3xl font-semibold leading-tight text-white">Close the gap between schedule and drawal — at the lowest cost, with proof.</h1>
-          <ol className="grid grid-cols-2 gap-3 text-sm">
-            {[
-              ['Monitor & assess', 'Telemetry quality, ACE, DSM exposure, 2-hour forecast'],
-              ['Optimise & screen', 'Priority LP (BESS → industry → others → RTM) and Digital Twin gate'],
-              ['Approve & dispatch', 'Autonomy policy, dual authorisation, HMAC-authenticated setpoints'],
-              ['Measure & settle', 'Baseline M&V, counterfactual ledger, hash-chained audit'],
-            ].map(([t, d]) => (
-              <li key={t} className="rounded-lg border border-white/10 bg-white/5 p-3">
-                <div className="font-medium text-white">{t}</div>
-                <div className="text-xs text-slate-400">{d}</div>
-              </li>
-            ))}
-          </ol>
-        </div>
-        <div className="relative text-[11px] text-slate-500">Simulation &amp; advisory prototype — not authorised for autonomous grid control. Prices, bids, roster and DSM multipliers are demonstration data.</div>
-      </div>
 
-      <div className="flex items-center justify-center bg-[var(--bg)] p-10 text-[var(--fg)]">
+        <div className="relative text-[11px] text-[var(--muted)]">Simulation &amp; advisory prototype — not authorised for autonomous grid control. Prices, bids, roster and DSM multipliers are demonstration data.</div>
+      </section>
+
+      <section className="flex items-center justify-center p-10">
         <div className="w-full max-w-md">
-          <div className="mb-6 grid grid-cols-2 gap-1 rounded-lg bg-[var(--chip)] p-1">
-            {(['control', 'industry'] as const).map((m) => (
-              <button key={m} onClick={() => { setMode(m); setU(m === 'control' ? 'operator' : 'jsw'); setErr(null); }}
-                className={cx('rounded-md px-3 py-2 text-sm font-medium', mode === m ? 'bg-[var(--accent)] text-[var(--accent-fg)]' : 'text-[var(--muted)]')}>
-                {m === 'control' ? 'SLDC control room' : 'Industry portal'}
+          <div className="label mb-2">Choose your workspace</div>
+          <div className="mb-6 grid grid-cols-2 gap-2">
+            {(Object.keys(FLOWS) as ('control' | 'industry')[]).map((m) => (
+              <button key={m} onClick={() => { setMode(m); setU(ACCOUNTS[m][0][0]); setErr(null); }}
+                className={cx('rounded-xl border p-3 text-left transition', mode === m ? 'border-[var(--accent)] bg-[var(--accent-soft)]' : 'border-[var(--line)] hover:bg-[var(--s2)]')}>
+                <Icon name={FLOWS[m].icon} size={18} className={mode === m ? 'text-[var(--accent-ink)]' : 'text-[var(--muted)]'} />
+                <div className="mt-2 text-sm font-semibold">{FLOWS[m].title}</div>
+                <div className="mt-0.5 text-[11px] leading-snug text-[var(--muted)]">{FLOWS[m].blurb}</div>
               </button>
             ))}
           </div>
-          <h2 className="text-lg font-semibold">{industry ? 'Industry participants' : 'Control-room sign in'}</h2>
-          <p className="mb-4 text-sm text-[var(--muted)]">
-            {industry
-              ? 'See what the SLDC offers and needs, make flexibility offers, follow dispatch instructions and verified payments.'
-              : 'Spatial operations console for the shift: grid need, DR events, approvals, load rotation and settlement.'}
-          </p>
-          <form onSubmit={submit} className="space-y-3">
-            <input className={cx(inputCls, 'py-2 text-sm')} value={u} onChange={(e) => setU(e.target.value)} placeholder="Username" aria-label="Username" autoComplete="username" />
-            <input className={cx(inputCls, 'py-2 text-sm')} type="password" value={p} onChange={(e) => setP(e.target.value)} placeholder="Password" aria-label="Password" autoComplete="current-password" />
+          <form onSubmit={submit} className="space-y-2.5">
+            <input className={cx(inputCls, 'h-9 text-sm')} value={u} onChange={(e) => setU(e.target.value)} placeholder="Username" aria-label="Username" autoComplete="username" />
+            <input className={cx(inputCls, 'h-9 text-sm')} type="password" value={p} onChange={(e) => setP(e.target.value)} placeholder="Password" aria-label="Password" autoComplete="current-password" />
             {err && <div role="alert" className="text-sm text-[var(--alarm)]">■ {err}</div>}
-            <Btn type="submit" kind="primary" className="w-full py-2 text-sm" disabled={busy}>{busy ? 'Signing in…' : 'Sign in'}</Btn>
+            <Btn type="submit" kind="primary" className="h-9 w-full text-sm" disabled={busy}>{busy ? 'Signing in…' : `Sign in to ${FLOWS[mode].title}`}</Btn>
           </form>
-          <div className="mt-6 text-xs text-[var(--muted)]">Demo accounts (password <code>demo</code>):</div>
-          <div className="mt-2 flex flex-wrap gap-1.5">
-            {(industry ? INDUSTRY : CONTROL).map(([id, label]) => (
-              <Btn key={id} small onClick={() => { setU(id); submit(undefined, id); }}>{label}</Btn>
-            ))}
+          <div className="mt-6 text-[11px] text-[var(--muted)]">Demo accounts · password <code className="text-[var(--fg)]">demo</code></div>
+          <div className="mt-2 grid grid-cols-3 gap-1.5">
+            {ACCOUNTS[mode].map(([id, label]) => <Btn key={id} small onClick={() => { setU(id); submit(undefined, id); }}>{label}</Btn>)}
           </div>
         </div>
-      </div>
+      </section>
     </div>
   );
 }

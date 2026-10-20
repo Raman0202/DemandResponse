@@ -86,7 +86,8 @@ class Dispatcher:
         self.commands.append(c)
         self.commands = self.commands[-400:]
         self.audit.append("COMMAND", "system", c.id,
-                          f"{kind} {r.name} → {c.setpoint:.0f} MW {direction} ({'awaiting approval: ' + needs_approval if needs_approval else 'ready'})")
+                          f"{kind} {r.name} → {c.setpoint:.0f} MW {direction} — "
+                          + (f"needs approval: {needs_approval}" if needs_approval else "automatic under autonomy policy"))
         return c
 
     def send(self, c: Command, t: float, r) -> None:
@@ -102,7 +103,7 @@ class Dispatcher:
         c.start_mw = r.delivering if r.direction == c.direction else 0.0
         if ok:
             c.state = "SENT"
-            self.audit.append("SEND", "system", c.id, f"Sent {c.kind} {c.name} {c.setpoint:.0f} MW, HMAC {c.tag[:12]}…")
+            self.audit.append("SEND", "system", c.id, f"Sent {c.kind} {c.name} {c.setpoint:.0f} MW — HMAC-SHA-256 tag {c.tag[:12]}…, key {KEY_ID}")
         else:
             c.state, c.fail_reason, c.closed_t = "FAILED", f"gateway refused: {why}", t
             self.audit.append("SEND_FAIL", "system", c.id, f"Gateway refused {c.name}: {why}")
@@ -117,7 +118,7 @@ class Dispatcher:
                 if c.id in acks:
                     c.state, c.ack_t = "ACKED", t
                     r.setpoint, r.direction = c.setpoint, c.direction
-                    self.audit.append("ACK", c.resource, c.id, f"Ack {c.name} after {t - c.sent_t:.0f} s")
+                    self.audit.append("ACK", c.resource, c.id, f"Ack {c.name} after {t - c.sent_t:.0f} s — gateway verified key, tag, age and replay")
                 elif t - c.sent_t > C.ACK_TIMEOUT_S:
                     c.state, c.fail_reason, c.closed_t = "FAILED", f"no ack in {C.ACK_TIMEOUT_S} s", t
                     self.field.pending.pop(c.id, None)
